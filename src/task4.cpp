@@ -5,7 +5,7 @@ namespace utils {
 template <class T>
 class Heap {
 public:
-    Heap(size_t, bool(const T&, const T&), bool(const T&, const T&));
+    Heap(size_t, bool(const T&, const T&));
     ~Heap();
 
     Heap(const Heap&) = delete;
@@ -24,18 +24,16 @@ private:
     T* buff;
     size_t buffsize;
     bool (*strictcomp)(const T&, const T&);
-    bool (*nostrictcomp)(const T&, const T&);
     size_t size;
 };
 
 template <class T>
-Heap<T>::Heap(size_t heapsize, bool strcomp(const T& l, const T& r), bool nstrcomp(const T& l, const T& r))
+Heap<T>::Heap(size_t heapsize, bool strcomp(const T& l, const T& r))
     : buffsize(heapsize)
     , size(0)
 {
     this->buff = new T[heapsize];
     this->strictcomp = strcomp;
-    this->nostrictcomp = nstrcomp;
 }
 
 template <class T>
@@ -79,7 +77,7 @@ void Heap<T>::siftUp(size_t i)
 {
     while (i > 0) {
         size_t parent = (i - 1) / 2;
-        if (this->nostrictcomp(this->buff[i], this->buff[parent]))
+        if (this->strictcomp(this->buff[i], this->buff[parent]))
             return;
 
         std::swap(this->buff[i], this->buff[parent]);
@@ -137,10 +135,6 @@ bool strictcomp(const User& l, const User& r)
     return l.attendance >= r.attendance;
 }
 
-bool nostrictcomp(const User& l, const User& r)
-{
-    return l.attendance > r.attendance;
-}
 
 int main()
 {
@@ -154,7 +148,7 @@ int main()
         tmp[i].attendance = att;
     }
 
-    utils::Heap<User> h(K, strictcomp, nostrictcomp);
+    utils::Heap<User> h(K, strictcomp);
     h.build(tmp, K);
 
     for (size_t i = 0; i < N - K + 1; ++i) {
