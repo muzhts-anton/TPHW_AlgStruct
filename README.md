@@ -1,2 +1,2 @@
-# TPHW_AlgStruct
-A repository of homework of a TechnoPark course algorithms and data structures (sem 1)
+# Task7 [module 1]
+Дан массив неотрицательных целых 64-битных чисел. Количество чисел не больше 1000000. Отсортировать массив методом поразрядной сортировки LSD по байтам.
