@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# Env
+.vscode/
+build/
+.trash/
+rebuild.sh
