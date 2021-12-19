@@ -1,26 +1,20 @@
 #include <iostream>
-#include <list>
+
+namespace utils {
 
 template <class T>
 class AvlTree {
-public:
-    AvlTree()
-        : _root(nullptr) {};
-    ~AvlTree();
-
-    void append(const T& data);
-    void erase(const T& data);
-
-    size_t getPlace(size_t data);
-
 private:
     struct TreeNode {
-        TreeNode(const T& data, TreeNode* left, TreeNode* right)
-            : data(data)
+        explicit TreeNode(const T& key)
+            : key(key)
+            , left(nullptr)
+            , right(nullptr)
             , height(1)
-            , numelems(1)
-            , left(left)
-            , right(right) {};
+            , weight(1)
+        {
+        }
+
         ~TreeNode()
         {
             if (left)
@@ -29,192 +23,256 @@ private:
                 delete right;
         }
 
-        T data;
-        uint8_t height;
-        size_t numelems;
+        T key;
         TreeNode* left;
         TreeNode* right;
+        int height;
+        int weight;
     };
 
+public:
+    explicit AvlTree(bool (*comp)(const T&, const T&))
+        : _root(nullptr)
+        , _comp(comp) {};
+
+    ~AvlTree() { delete _root; }
+
+    inline bool search(const T& key) const { return find(key).first; }
+    inline void append(const T& key) { _root = insert(_root, key); }
+    bool erase(const T& key);
+    inline int getPlace(const T& key) const { return computePosition(_root, key); }
+    std::pair<bool, T> getKStat(int index) const;
+
 private:
-    TreeNode* insert(TreeNode* node, const T& data);
+    inline int getWeight(TreeNode* node) const { return node ? node->weight : 0; }
+    inline int getHeight(TreeNode* node) const { return node ? node->height : 0; }
+    inline int getBalanceFactor(TreeNode* node) const { return getHeight(node->left) - getHeight(node->right); }
 
-    TreeNode* removemin(TreeNode* node, TreeNode*& min);
-    TreeNode* remove(TreeNode* node, const T& data);
+    int computePosition(TreeNode* node, const T& key) const;
+    T computeKStat(TreeNode* node, int index) const;
 
-    TreeNode* rotateLeft(TreeNode* node);
-    TreeNode* rotateRight(TreeNode* node);
+    std::pair<bool, TreeNode*> find(const T& key) const;
+    TreeNode* insert(TreeNode* node, const T& key);
+
+    TreeNode* findAndRemoveMin(TreeNode* node, TreeNode*& min);
+    TreeNode* findAndRemoveMax(TreeNode* node, TreeNode*& max);
+    TreeNode* remove(TreeNode* node, const T& key);
+
     TreeNode* balance(TreeNode* node);
-
-    uint8_t getHeight(TreeNode* node) { return node ? node->height : 0; }
-    size_t getNumElems(TreeNode* node) { return node ? node->numelems : 0; }
-    size_t computeNumElems(TreeNode* node) { return 1 + getNumElems(node->right) + getNumElems(node->left); }
-    int8_t getBalanceFactor(TreeNode* node) { return this->getHeight(node->right) - this->getHeight(node->left); }
-    void recountHeight(TreeNode* node);
+    void leftRotate(TreeNode* node);
+    void rightRotate(TreeNode* node);
 
 private:
     TreeNode* _root;
+    bool (*_comp)(const T&, const T&);
 };
 
 template <class T>
-void AvlTree<T>::recountHeight(TreeNode* node)
+bool AvlTree<T>::erase(const T& key)
 {
-    uint8_t lh = getHeight(node->left);
-    uint8_t rh = getHeight(node->right);
-    node->height = std::max(lh, rh) + 1;
+    if (!search(key))
+        return false;
+
+    _root = remove(_root, key);
+    return true;
 }
 
 template <class T>
-typename AvlTree<T>::TreeNode* AvlTree<T>::rotateRight(TreeNode* node)
+std::pair<bool, T> AvlTree<T>::getKStat(int index) const
 {
-    TreeNode* tmp = node->left;
-    node->left = tmp->right;
-    tmp->right = node;
-
-    recountHeight(node);
-    recountHeight(tmp);
-
-    node->numelems = computeNumElems(node);
-    tmp->numelems = computeNumElems(tmp);
-
-    return tmp;
+    if (index >= getWeight(_root)) {
+        return std::make_pair(false, 0);
+    }
+    return std::make_pair(true, computeKStat(_root, index));
 }
 
 template <class T>
-typename AvlTree<T>::TreeNode* AvlTree<T>::rotateLeft(TreeNode* node)
+std::pair<bool, typename AvlTree<T>::TreeNode*> AvlTree<T>::find(const T& key) const
 {
-    TreeNode* tmp = node->right;
-    node->right = tmp->left;
-    tmp->left = node;
+    TreeNode* tmp = _root;
+    while (tmp) {
+        if (!(_comp(tmp->key, key)) && !(_comp(key, tmp->key)))
+            return std::make_pair(true, tmp);
 
-    recountHeight(node);
-    recountHeight(tmp);
-
-    node->numelems = computeNumElems(node);
-    tmp->numelems = computeNumElems(tmp);
-
-    return tmp;
-}
-
-template <class T>
-typename AvlTree<T>::TreeNode* AvlTree<T>::balance(TreeNode* node)
-{
-    node->numelems = computeNumElems(node);
-    recountHeight(node);
-
-    if (getBalanceFactor(node) == 2) {
-        if (getBalanceFactor(node->right) < 0)
-            node->right = rotateRight(node->right);
-        return rotateLeft(node);
+        (_comp(key, tmp->key)) ? tmp = tmp->left : tmp = tmp->right;
     }
 
-    if (getBalanceFactor(node) == -2) {
-        if (getBalanceFactor(node->left) > 0)
-            node->left = rotateLeft(node->left);
-        return rotateRight(node);
-    }
-
-    return node;
+    return std::make_pair(false, nullptr);
 }
 
 template <class T>
-typename AvlTree<T>::TreeNode* AvlTree<T>::insert(TreeNode* node, const T& data)
+int AvlTree<T>::computePosition(TreeNode* node, const T& key) const
 {
     if (!node)
-        return new TreeNode(data, nullptr, nullptr);
+        return 0;
 
-    if (data < node->data)
-        node->left = insert(node->left, data);
+    if (_comp(key, node->key))
+        return computePosition(node->left, key);
+
+    return computePosition(node->right, key) + getWeight(node->left) + 1;
+}
+
+template <class T>
+T AvlTree<T>::computeKStat(TreeNode* node, int index) const
+{
+    if (getWeight(node->left) == index)
+        return node->key;
+
+    if (index < getWeight(node->left))
+        return computeKStat(node->left, index);
+
+    return computeKStat(node->right, index - getWeight(node->left) - 1);
+}
+
+template <class T>
+typename AvlTree<T>::TreeNode* AvlTree<T>::insert(TreeNode* node, const T& key)
+{
+    if (!node)
+        return new TreeNode(key);
+
+    if (_comp(key, node->key))
+        node->left = insert(node->left, key);
     else
-        node->right = insert(node->right, data);
+        node->right = insert(node->right, key);
 
     return balance(node);
 }
 
 template <class T>
-void AvlTree<T>::append(const T& data)
-{
-    _root = insert(_root, data);
-}
-
-template <class T>
-typename AvlTree<T>::TreeNode* AvlTree<T>::removemin(TreeNode* node, TreeNode*& min)
+typename AvlTree<T>::TreeNode* AvlTree<T>::findAndRemoveMin(TreeNode* node, TreeNode*& min)
 {
     if (!node->left) {
         min = node;
         return node->right;
     }
 
-    node->left = removemin(node->left, min);
+    node->left = findAndRemoveMin(node->left, min);
 
     return balance(node);
 }
 
 template <class T>
-typename AvlTree<T>::TreeNode* AvlTree<T>::remove(TreeNode* node, const T& data)
+typename AvlTree<T>::TreeNode* AvlTree<T>::findAndRemoveMax(TreeNode* node, TreeNode*& max)
 {
-    if (!node)
-        return nullptr;
+    if (!node->right) {
+        max = node;
+        return node->left;
+    }
 
-    if (data < node->data)
-        node->left = remove(node->left, data);
-    else if (data > node->data)
-        node->right = remove(node->right, data);
+    node->right = findAndRemoveMax(node->right, max);
+
+    return balance(node);
+}
+
+template <class T>
+typename AvlTree<T>::TreeNode* AvlTree<T>::remove(TreeNode* node, const T& key)
+{
+    if (_comp(node->key, key))
+        node->right = remove(node->right, key);
+    else if (_comp(key, node->key))
+        node->left = remove(node->left, key);
     else {
-        TreeNode* r = node->right;
-        TreeNode* l = node->left;
+        TreeNode* left = node->left;
+        TreeNode* right = node->right;
 
-        node->left = nullptr;
-        node->right = nullptr;
+        node->left = node->right = nullptr;
         delete node;
-        if (!r)
-            return l;
 
-        TreeNode* min = nullptr;
-        TreeNode* tmp = removemin(r, min);
-        min->left = l;
-        min->right = tmp;
+        if (!left && !right)
+            return nullptr;
+        if (!right)
+            return left;
+        if (!left)
+            return right;
 
-        return balance(min);
+        if (right->height >= left->height) {
+            TreeNode* min = nullptr;
+            TreeNode* tmp = findAndRemoveMin(right, min);
+            min->right = tmp;
+            min->left = left;
+            return balance(min);
+        } else {
+            TreeNode* max = nullptr;
+            TreeNode* tmp = findAndRemoveMax(left, max);
+            max->left = tmp;
+            max->right = right;
+            return balance(max);
+        }
     }
-
     return balance(node);
 }
 
 template <class T>
-void AvlTree<T>::erase(const T& data)
+typename AvlTree<T>::TreeNode* AvlTree<T>::balance(TreeNode* node)
 {
-    _root = remove(_root, data);
-}
-
-template <class T>
-AvlTree<T>::~AvlTree()
-{
-    delete _root;
-}
-
-template <class T>
-size_t AvlTree<T>::getPlace(size_t data)
-{
-    TreeNode* tmp = _root;
-    size_t resplace = getNumElems(tmp->left);
-
-    while (resplace != data) {
-        if (resplace > data)
+    TreeNode* tmp = node;
+    if (getBalanceFactor(node) == 2) {
+        if (getBalanceFactor(node->left) == -1) {
+            TreeNode* tmp = node->left;
+            node->left = node->left->right;
+            leftRotate(tmp);
+        }
+        tmp = node->left;
+        rightRotate(node);
+    } else if (getBalanceFactor(node) == -2) {
+        if (getBalanceFactor(node->right) == 1) {
+            TreeNode* tmp = node->right;
+            node->right = node->right->left;
+            rightRotate(tmp);
+        }
+        tmp = node->right;
+        leftRotate(node);
     }
+
+    tmp->weight = getWeight(tmp->left) + getWeight(tmp->right) + 1;
+    tmp->height = std::max(getHeight(tmp->left), getHeight(tmp->right)) + 1;
+
+    return tmp;
 }
+
+template <class T>
+void AvlTree<T>::leftRotate(TreeNode* node)
+{
+    TreeNode* tmp = node->right;
+    node->right = tmp->left;
+    tmp->left = node;
+
+    node->weight = getWeight(node->left) + getWeight(node->right) + 1;
+    tmp->weight = getWeight(tmp->left) + getWeight(tmp->right) + 1;
+
+    node->height = std::max(getHeight(node->left), getHeight(node->right)) + 1;
+    tmp->height = std::max(getHeight(tmp->left), getHeight(tmp->right)) + 1;
+}
+
+template <class T>
+void AvlTree<T>::rightRotate(TreeNode* node)
+{
+    TreeNode* tmp = node->left;
+    node->left = tmp->right;
+    tmp->right = node;
+
+    node->weight = getWeight(node->left) + getWeight(node->right) + 1;
+    tmp->weight = getWeight(tmp->left) + getWeight(tmp->right) + 1;
+
+    node->height = std::max(getHeight(node->left), getHeight(node->right)) + 1;
+    tmp->height = std::max(getHeight(tmp->left), getHeight(tmp->right)) + 1;
+}
+
+} // namespace utils
 
 int main()
 {
-    AvlTree<int> a;
-    int n = 0;
-    std::cin >> n;
-    int num = 0;
-    size_t statistic = 0;
-    for (size_t i = 0; i < n; ++i) {
-        std::cin >> num >> statistic;
-        num > 0 ? a.append(num) : a.erase(abs(num));
-        std::cout << a.getPlace(statistic) << "\n";
+    int num;
+    std::cin >> num;
+    utils::AvlTree<size_t> tasker([](const size_t& l, const size_t& r) { return l > r; });
+    for (size_t i = 0, operation = 0, obj = 0; i < num; ++i) {
+        std::cin >> operation >> obj;
+        if (operation == 1) {
+            std::cout << tasker.getPlace(obj) << std::endl;
+            tasker.append(obj);
+        } else if (operation == 2) {
+            tasker.erase(tasker.getKStat(obj).second);
+        }
     }
     return 0;
 }

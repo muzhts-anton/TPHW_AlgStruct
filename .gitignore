@@ -34,3 +34,4 @@
 # Env
 .vscode/
 build/
+.trash/
