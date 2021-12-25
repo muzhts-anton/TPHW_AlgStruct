@@ -1,5 +1,6 @@
 # Task1 [module 3]
 Дан базовый интерфейс для представления ориентированного графа:
+```c++
 struct IGraph {
     virtual ~IGraph() {}
 	
@@ -11,7 +12,7 @@ struct IGraph {
     virtual std::vector<int> GetNextVertices(int vertex) const = 0;
     virtual std::vector<int> GetPrevVertices(int vertex) const = 0;
 };
-
+```
 Необходимо написать несколько реализаций интерфейса:
 ListGraph, хранящий граф в виде массива списков смежности,
 MatrixGraph, хранящий граф в виде матрицы смежности,
